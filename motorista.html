@@ -1,40 +1,50 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
+  <meta charset="UTF-8">
   <title>Medicar Motorista</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; background:#eef2f5; margin:0; padding:0; }
+    body { font-family: Arial, sans-serif; margin:0; background:#eef2f5; }
     h1 { background:#28a745; color:#fff; padding:15px; margin:0; text-align:center; }
-    div, ul { margin:20px; }
-    input, button { padding:10px; margin:5px; border-radius:5px; border:1px solid #ccc; }
-    button { background:#28a745; color:#fff; cursor:pointer; }
+    .screen { display:none; padding:20px; }
+    .active { display:block; }
+    input, button { width:100%; padding:12px; margin:8px 0; border-radius:8px; border:1px solid #ccc; font-size:16px; }
+    button { background:#28a745; color:#fff; font-weight:bold; }
     button:hover { background:#1e7e34; }
-    #map { border:2px solid #28a745; border-radius:8px; }
     ul { list-style:none; padding:0; }
     li { background:#fff; margin:5px 0; padding:10px; border-radius:5px; border:1px solid #ddd; }
+    #map { height:400px; width:100%; border-radius:8px; margin-top:15px; }
   </style>
 </head>
 <body>
-  <h1>Área do Motorista</h1>
+  <h1>Área do Motorista 🚕</h1>
 
-  <div>
+  <!-- Tela de login/cadastro -->
+  <div id="authScreen" class="screen active">
+    <h2>Entrar</h2>
     <input id="email" placeholder="Email">
     <input id="password" type="password" placeholder="Senha">
     <button onclick="register()">Cadastrar</button>
     <button onclick="login()">Login</button>
     <button onclick="resetPassword()">Esqueci a senha</button>
-    <button onclick="logout()">Sair</button>
   </div>
 
-  <button onclick="ficarOnline()">Ficar Online</button>
-  <h3>Minhas Corridas</h3>
-  <ul id="minhasCorridas"></ul>
-  <p>Ganhos do dia: R$ <span id="ganhosDia">0</span></p>
-  <p>Ganhos totais: R$ <span id="ganhosTotais">0</span></p>
-  <p>Taxa da plataforma (20%): R$ <span id="taxa">0</span></p>
-  <p>Lucro líquido: R$ <span id
+  <!-- Tela principal -->
+  <div id="appScreen" class="screen">
+    <button onclick="ficarOnline()">Ficar Online</button>
+    <h3>Minhas Corridas</h3>
+    <ul id="minhasCorridas"></ul>
+    <p>Ganhos do dia: R$ <span id="ganhosDia">0</span></p>
+    <p>Ganhos totais: R$ <span id="ganhosTotais">0</span></p>
+    <p>Taxa da plataforma (20%): R$ <span id="taxa">0</span></p>
+    <p>Lucro líquido: R$ <span id="lucro">0</span></p>
+    <div id="map"></div>
+  </div>
+
+ 
