@@ -1,1 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Medicar Passageiro</title>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+</head>
+<body>
+  <h1>Mydicar - Passageiro</h1>
+
+  <!-- Cadastro/Login -->
+  <div>
+    <input id="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Senha">
+    <button onclick="register()">Cadastrar</button>
+    <button onclick="login()">Login</button>
+    <button onclick="resetPassword()">Esqueci a senha</button>
+  </div>
+
+  <!-- Solicitar corrida -->
+  <div>
+    <input id="destino" placeholder="Destino (somente Jaraguá, Guaramirim, Schroeder)">
+    <button onclick="solicitarCorrida()">Solicitar Corrida</button>
+  </div>
+
+  <!-- Minhas corridas -->
+  <h3>Minhas Corridas</h3>
+  <ul id="minhasCorridas"></ul>
+
+  <!-- Avaliação -->
+  <div id="avaliacao" style="display:none;">
+    <h3>Avalie o motorista</h3>
+    <input id="nota" type="number" min="1" max="5" placeholder="Nota 1-5">
+    <button onclick="avaliarMotorista()">Enviar Avaliação</button>
+  </div>
+
+  <!-- Mapa -->
+  <div id="map" style="height:400px;width:100%;"></div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "YOUR_FIREBASE_API_KEY",
+      authDomain: "YOUR_PROJECT.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      databaseURL: "https://YOUR_PROJECT.firebaseio.com",
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const realtime = firebase.database();
+
+    function register() {
+      auth.createUserWithEmailAndPassword(
+        document.getElementById("email").value,
+        document.getElementById("password").value
+      ).then(() => {
+        alert("Usuário cadastrado! Verifique seu email.");
+        auth.currentUser.sendEmailVerification();
+      });
+    }
+    function login() {
+      auth.signInWithEmailAndPassword(
+        document.getElementById("email").value,
+        document.getElementById("password").value
+      ).then(() => {
+        alert("Login feito!");
+        carregarCorridas();
+      });
+    }
+    function resetPassword() {
+      const email = document.getElementById("email").value;
+      auth.sendPasswordResetEmail(email).then(() => alert("Email de redefinição enviado!"));
+    }
+
+    function solicitarCorrida() {
+      const destino = document.getElementById("destino").value.toLowerCase();
+      if (!["jaraguá do sul","guaramirim","schroeder"].some(c => destino.includes(c))) {
+        return alert("Localização inválida! Corridas só em Jaraguá do Sul, Guaramirim ou Schroeder.");
+      }
+      const valor = calcularValor(destino);
+      const corridaRef = realtime.ref("corridas").push({
+        usuario: auth.currentUser.email,
+        destino: destino,
+        status: "aguardando",
+        valor: valor,
+        horario: new Date().toLocaleString()
+      });
+      alert("Corrida solicitada! Valor estimado: R$ " + valor);
+    }
+
+    function calcularValor(destino) {
+      if (destino.includes("guaramirim")) return 15;
+      if (destino.includes("schroeder")) return 18;
+      return 10; // dentro de Jaraguá
+    }
+
+    function carregarCorridas() {
+      realtime.ref("corridas").orderByChild("usuario").equalTo(auth.currentUser.email).on("value", snap => {
+        const lista = document.getElementById("minhasCorridas");
+        lista.innerHTML = "";
+        snap.forEach(c => {
+          const dados = c.val();
+          const li = document.createElement("li");
+          li.innerText = `${dados.destino} - R$${dados.valor} - ${dados.status} - ${dados.horario}`;
+          lista.appendChild(li);
+          if (dados.status === "finalizada") {
+            document.getElementById("avaliacao").style.display = "block";
+          }
+        });
+      });
+    }
+
+    function avaliarMotorista() {
+      const nota = document.getElementById("nota").value;
+      realtime.ref("avaliacoes").push({
+        usuario: auth.currentUser.email,
+        nota: nota
+      });
+      alert("Avaliação enviada!");
+      document.getElementById("avaliacao").style.display = "none";
+    }
+
+    const map = L.map('map').setView([-26.47, -49.08], 12);
+    L.tileLayer(`https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}.png?apiKey=YOUR_GEOAPIFY_API_KEY`, {
+      attribution: '© OpenStreetMap contributors © Geoapify',
+      maxZoom: 20
+    }).addTo(map);
+  </script>
+</body>
+</html>
 
