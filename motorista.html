@@ -7,11 +7,21 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background:#eef2f5; margin:0; padding:0; }
+    h1 { background:#28a745; color:#fff; padding:15px; margin:0; text-align:center; }
+    div, ul { margin:20px; }
+    input, button { padding:10px; margin:5px; border-radius:5px; border:1px solid #ccc; }
+    button { background:#28a745; color:#fff; cursor:pointer; }
+    button:hover { background:#1e7e34; }
+    #map { border:2px solid #28a745; border-radius:8px; }
+    ul { list-style:none; padding:0; }
+    li { background:#fff; margin:5px 0; padding:10px; border-radius:5px; border:1px solid #ddd; }
+  </style>
 </head>
 <body>
-  <h1>Área do Motorista 🚕</h1>
+  <h1>Área do Motorista</h1>
 
-  <!-- Cadastro/Login -->
   <div>
     <input id="email" placeholder="Email">
     <input id="password" type="password" placeholder="Senha">
@@ -27,39 +37,4 @@
   <p>Ganhos do dia: R$ <span id="ganhosDia">0</span></p>
   <p>Ganhos totais: R$ <span id="ganhosTotais">0</span></p>
   <p>Taxa da plataforma (20%): R$ <span id="taxa">0</span></p>
-  <p>Lucro líquido: R$ <span id="lucro">0</span></p>
-
-  <div id="map" style="height:400px;width:100%;"></div>
-
-  <script>
-    const firebaseConfig = {
-      apiKey: "YOUR_FIREBASE_API_KEY",
-      authDomain: "YOUR_PROJECT.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-      databaseURL: "https://YOUR_PROJECT.firebaseio.com",
-    };
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const realtime = firebase.database();
-
-    function register() {
-      auth.createUserWithEmailAndPassword(
-        document.getElementById("email").value,
-        document.getElementById("password").value
-      ).then(() => {
-        alert("Motorista cadastrado! Verifique seu email.");
-        auth.currentUser.sendEmailVerification();
-      });
-    }
-    function login() {
-      auth.signInWithEmailAndPassword(
-        document.getElementById("email").value,
-        document.getElementById("password").value
-      ).then(() => {
-        alert("Login feito!");
-        carregarCorridas();
-      });
-    }
-    function resetPassword() {
-      const email = document.getElementById("email").value
-
+  <p>Lucro líquido: R$ <span id
