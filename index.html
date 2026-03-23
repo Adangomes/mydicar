@@ -7,11 +7,22 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f5f5f5; margin:0; padding:0; }
+    h1 { background:#0077cc; color:#fff; padding:15px; margin:0; text-align:center; }
+    div, ul { margin:20px; }
+    input, button { padding:10px; margin:5px; border-radius:5px; border:1px solid #ccc; }
+    button { background:#0077cc; color:#fff; cursor:pointer; }
+    button:hover { background:#005fa3; }
+    #map { border:2px solid #0077cc; border-radius:8px; }
+    ul { list-style:none; padding:0; }
+    li { background:#fff; margin:5px 0; padding:10px; border-radius:5px; border:1px solid #ddd; }
+    #avaliacao { background:#fff; padding:15px; border-radius:8px; border:1px solid #ddd; }
+  </style>
 </head>
 <body>
-  <h1>Mydicar - Passageiro</h1>
+  <h1>Medicar 🚗 - Passageiro</h1>
 
-  <!-- Cadastro/Login -->
   <div>
     <input id="email" placeholder="Email">
     <input id="password" type="password" placeholder="Senha">
@@ -20,27 +31,24 @@
     <button onclick="resetPassword()">Esqueci a senha</button>
   </div>
 
-  <!-- Solicitar corrida -->
   <div>
-    <input id="destino" placeholder="Destino (somente Jaraguá, Guaramirim, Schroeder)">
+    <input id="destino" placeholder="Destino (Jaraguá, Guaramirim, Schroeder)">
     <button onclick="solicitarCorrida()">Solicitar Corrida</button>
   </div>
 
-  <!-- Minhas corridas -->
   <h3>Minhas Corridas</h3>
   <ul id="minhasCorridas"></ul>
 
-  <!-- Avaliação -->
   <div id="avaliacao" style="display:none;">
     <h3>Avalie o motorista</h3>
     <input id="nota" type="number" min="1" max="5" placeholder="Nota 1-5">
     <button onclick="avaliarMotorista()">Enviar Avaliação</button>
   </div>
 
-  <!-- Mapa -->
-  <div id="map" style="height:400px;width:100%;"></div>
+  <div id="map" style="height:400px;width:90%;margin:20px auto;"></div>
 
   <script>
+    // Firebase config
     const firebaseConfig = {
       apiKey: "YOUR_FIREBASE_API_KEY",
       authDomain: "YOUR_PROJECT.firebaseapp.com",
@@ -64,10 +72,7 @@
       auth.signInWithEmailAndPassword(
         document.getElementById("email").value,
         document.getElementById("password").value
-      ).then(() => {
-        alert("Login feito!");
-        carregarCorridas();
-      });
+      ).then(() => carregarCorridas());
     }
     function resetPassword() {
       const email = document.getElementById("email").value;
@@ -77,10 +82,10 @@
     function solicitarCorrida() {
       const destino = document.getElementById("destino").value.toLowerCase();
       if (!["jaraguá do sul","guaramirim","schroeder"].some(c => destino.includes(c))) {
-        return alert("Localização inválida! Corridas só em Jaraguá do Sul, Guaramirim ou Schroeder.");
+        return alert("Localização inválida! Só Jaraguá, Guaramirim ou Schroeder.");
       }
       const valor = calcularValor(destino);
-      const corridaRef = realtime.ref("corridas").push({
+      realtime.ref("corridas").push({
         usuario: auth.currentUser.email,
         destino: destino,
         status: "aguardando",
@@ -93,7 +98,7 @@
     function calcularValor(destino) {
       if (destino.includes("guaramirim")) return 15;
       if (destino.includes("schroeder")) return 18;
-      return 10; // dentro de Jaraguá
+      return 10;
     }
 
     function carregarCorridas() {
@@ -130,4 +135,3 @@
   </script>
 </body>
 </html>
-
