@@ -8,142 +8,128 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
   <style>
-    body { font-family: 'Segoe UI', Arial, sans-serif; margin:0; background:#f0f4f7; }
+    body { font-family: 'Segoe UI', sans-serif; margin:0; background:#f0f4f7; }
     h1 { background:#28a745; color:#fff; padding:15px; margin:0; text-align:center; font-size: 20px; }
-    .screen { display:none; padding:20px; }
+    .screen { display:none; padding:15px; }
     .active { display:block; }
     .card { background:#fff; padding:15px; border-radius:12px; margin-bottom:15px; box-shadow:0 4px 6px rgba(0,0,0,0.1); }
-    input, button { width:100%; padding:14px; margin:6px 0; border-radius:8px; border:1px solid #ddd; box-sizing:border-box; font-size: 16px; }
-    button { background:#28a745; color:#fff; font-weight:bold; border:none; cursor:pointer; }
-    button:active { transform: scale(0.98); }
-    .btn-secondary { background:#6c757d; margin-top: 10px; }
-    .status-online { background:#d4edda; color:#155724; padding:10px; border-radius:8px; text-align:center; margin-bottom:15px; font-weight: bold; }
-    .chamada-card { border-left: 5px solid #28a745; position: relative; }
-    .info-rota { font-size: 14px; color: #444; margin: 10px 0; }
-    .label-local { font-weight: bold; color: #28a745; }
+    button { width:100%; padding:15px; margin:10px 0; border-radius:8px; border:none; font-weight:bold; cursor:pointer; font-size:16px; }
+    .btn-aceitar { background:#28a745; color:#fff; }
+    .btn-acao { background:#ffc107; color:#000; }
+    .info { font-size:14px; color:#555; }
+    .valor-ganho { color:#28a745; font-size:20px; font-weight:bold; }
   </style>
 </head>
 <body>
-
-  <h1>Painel do Motorista</h1>
+  <h1>Painel Motorista</h1>
 
   <div id="authScreen" class="screen active">
     <div class="card">
-      <input id="email" type="email" placeholder="Seu E-mail">
-      <input id="password" type="password" placeholder="Sua Senha">
-      <button onclick="fazerLogin()">Entrar</button>
-      <hr>
-      <p style="text-align:center; color:#666;">Novo por aqui? Cadastre seu veículo:</p>
-      <input id="nome" placeholder="Nome Completo">
-      <input id="modelo" placeholder="Modelo do Carro (Ex: Corsa)">
-      <input id="cor" placeholder="Cor">
-      <input id="placa" placeholder="Placa">
-      <button onclick="registrar()" class="btn-secondary">Cadastrar como Motorista</button>
+      <input id="email" placeholder="E-mail" style="width:90%; padding:10px; margin:5px;">
+      <input id="senha" type="password" placeholder="Senha" style="width:90%; padding:10px; margin:5px;">
+      <button onclick="fazerLogin()" class="btn-aceitar">Entrar</button>
+      <button onclick="registrar()" style="background:#6c757d; color:#fff;">Registrar Carro</button>
     </div>
   </div>
 
   <div id="appScreen" class="screen">
-    <div class="status-online">📍 Você está ONLINE</div>
+    <div id="listaChamadas"></div>
     
-    <div class="card">
-      <h3 style="margin-top:0;">Chamadas Disponíveis</h3>
-      <div id="listaChamadas">
-        <p style="color:#888;">Aguardando novas chamadas...</p>
-      </div>
+    <div id="corridaAtiva" class="card" style="display:none;">
+      <h3>Corrida em Andamento</h3>
+      <p id="infoCorrida" class="info"></p>
+      <p>Seu ganho: <span id="meuGanho" class="valor-ganho"></span></p>
+      <button id="btnProximoPasso" onclick="proximoPasso()" class="btn-acao"></button>
     </div>
-
-    <button onclick="auth.signOut(); location.reload();" style="background:#ff4444;">Ficar Offline (Sair)</button>
   </div>
 
   <script>
-    const firebaseConfig = {
-        apiKey: "AIzaSyCXA1yP1F-riNkzOX5zJs5gsQ82EzsT7Qg",
-        authDomain: "myproject26-10f0e.firebaseapp.com",
-        databaseURL: "https://myproject26-10f0e-default-rtdb.firebaseio.com",
-        projectId: "myproject26-10f0e",
-    };
+    const firebaseConfig = { apiKey: "AIzaSyCXA1yP1F-riNkzOX5zJs5gsQ82EzsT7Qg", authDomain: "myproject26-10f0e.firebaseapp.com", databaseURL: "https://myproject26-10f0e-default-rtdb.firebaseio.com", projectId: "myproject26-10f0e" };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.database();
 
-    auth.onAuthStateChanged(user => {
-      if (user) {
-        document.getElementById('authScreen').classList.remove('active');
+    let corridaAtualId = null;
+    let statusAtual = "";
+    let motoristaPos = null;
+
+    auth.onAuthStateChanged(user => { if (user) { 
+        document.getElementById('authScreen').classList.remove('active'); 
         document.getElementById('appScreen').classList.add('active');
-        iniciarRastreamento();
-        ouvirCorridas();
-      }
-    });
+        ouvirChamadas();
+        rastrearMotorista();
+    }});
 
-    function fazerLogin() {
-      auth.signInWithEmailAndPassword(email.value, password.value).catch(e => alert("Erro: " + e.message));
-    }
-
-    function registrar() {
-      const emailVal = document.getElementById("email").value;
-      const passVal = document.getElementById("password").value;
-      const info = {
-        nome: document.getElementById("nome").value,
-        modelo: document.getElementById("modelo").value,
-        cor: document.getElementById("cor").value,
-        placa: document.getElementById("placa").value,
-        tipo: "motorista"
-      };
-      if(!info.nome || !info.placa) return alert("Preencha os dados do veículo!");
-
-      auth.createUserWithEmailAndPassword(emailVal, passVal)
-        .then(res => db.ref("usuarios/motoristas/" + res.user.uid).set(info))
-        .catch(e => alert(e.message));
-    }
-
-    function iniciarRastreamento() {
+    function rastrearMotorista() {
       navigator.geolocation.watchPosition(pos => {
-        const path = "usuarios/motoristas/" + auth.currentUser.uid + "/posicao";
-        db.ref(path).set({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          timestamp: Date.now()
-        });
-      }, err => console.error(err), { enableHighAccuracy: true });
+        motoristaPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        db.ref("usuarios/motoristas/" + auth.currentUser.uid + "/posicao").set(motoristaPos);
+      }, null, { enableHighAccuracy: true });
     }
 
-    function ouvirCorridas() {
+    function ouvirChamadas() {
       db.ref("corridas_ativas").on("value", snap => {
         const lista = document.getElementById("listaChamadas");
+        const painelAtivo = document.getElementById("corridaAtiva");
         lista.innerHTML = "";
-        let temCorrida = false;
-
+        
         snap.forEach(cSnap => {
           const c = cSnap.val();
+          // Se for uma chamada nova
           if(c.status === "aguardando") {
-            temCorrida = true;
-            const div = document.createElement("div");
-            div.className = "card chamada-card";
-            div.innerHTML = `
-              <strong>🔔 Nova Solicitação</strong>
-              <div class="info-rota">
-                <span class="label-local">DE:</span> ${c.origemNome || "Localização atual"}<br>
-                <span class="label-local">PARA:</span> ${c.destinoNome}
-              </div>
-              <button onclick="aceitar('${cSnap.key}', ${c.origemLat}, ${c.origemLng})">ACEITAR CORRIDA</button>
-            `;
-            lista.appendChild(div);
+            lista.innerHTML += `
+              <div class="card">
+                <b>Nova Chamada!</b><br>Para: ${c.destinoNome}<br>
+                Ganho: R$ ${c.valorMotorista}<br>
+                <button class="btn-aceitar" onclick="aceitar('${cSnap.key}')">ACEITAR</button>
+              </div>`;
+          }
+          // Se for a corrida que este motorista aceitou
+          if(c.motoristaId === auth.currentUser.uid && c.status !== "finalizada") {
+            corridaAtualId = cSnap.key;
+            statusAtual = c.status;
+            lista.style.display = "none";
+            painelAtivo.style.display = "block";
+            atualizarPainelAtivo(c);
           }
         });
-
-        if(!temCorrida) lista.innerHTML = '<p style="color:#888;">Nenhuma chamada no momento...</p>';
       });
     }
 
-    function aceitar(id, lat, lng) {
-      db.ref("corridas_ativas/" + id).update({
-        status: "motorista_a_caminho",
-        motoristaId: auth.currentUser.uid
-      }).then(() => {
-        alert("Corrida aceita! Abrindo GPS para o passageiro...");
-        // Abre o Google Maps com a rota para o passageiro
-        window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
-      });
+    function aceitar(id) {
+      db.ref("corridas_ativas/" + id).update({ status: "a_caminho", motoristaId: auth.currentUser.uid });
+    }
+
+    function atualizarPainelAtivo(c) {
+      const btn = document.getElementById("btnProximoPasso");
+      document.getElementById("infoCorrida").innerText = "Destino: " + c.destinoNome;
+      document.getElementById("meuGanho").innerText = "R$ " + c.valorMotorista;
+
+      if(statusAtual === "a_caminho") {
+        btn.innerText = "CHEGUEI NO LOCAL";
+      } else if(statusAtual === "no_local") {
+        btn.innerText = "PASSAGEIRO EMBARCOU (INICIAR)";
+      } else if(statusAtual === "em_curso") {
+        btn.innerText = "FINALIZAR CORRIDA";
+      }
+    }
+
+    function proximoPasso() {
+      let novoStatus = "";
+      if(statusAtual === "a_caminho") novoStatus = "no_local";
+      else if(statusAtual === "no_local") novoStatus = "em_curso";
+      else if(statusAtual === "em_curso") {
+        novoStatus = "finalizada";
+        alert("Corrida Finalizada! Valor a receber: " + document.getElementById("meuGanho").innerText);
+        location.reload();
+      }
+      db.ref("corridas_ativas/" + corridaAtualId).update({ status: novoStatus });
+    }
+
+    function fazerLogin() { auth.signInWithEmailAndPassword(email.value, senha.value); }
+    function registrar() { 
+      const info = { nome: "Adan Motorista", modelo: "Renegade", cor: "Preto", placa: "ABC-1234" };
+      auth.createUserWithEmailAndPassword(email.value, senha.value).then(res => db.ref("usuarios/motoristas/"+res.user.uid).set(info));
     }
   </script>
 </body>
