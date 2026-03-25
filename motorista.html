@@ -2,44 +2,43 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Medicar - Motorista</title>
+  <title>Mydi Car - Motorista</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <style>
     body { font-family: Arial, sans-serif; margin:0; background:#eef2f5; }
     h1 { background:#28a745; color:#fff; padding:15px; margin:0; text-align:center; }
     .screen { display:none; padding:20px; }
     .active { display:block; }
-    input, button { width:100%; padding:12px; margin:8px 0; border-radius:8px; border:1px solid #ccc; font-size:16px; box-sizing: border-box; }
+    .card { background:#fff; padding:15px; border-radius:10px; margin-bottom:15px; box-shadow:0 2px 5px rgba(0,0,0,0.1); }
+    input, button { width:100%; padding:12px; margin:5px 0; border-radius:8px; border:1px solid #ccc; box-sizing:border-box; }
     button { background:#28a745; color:#fff; font-weight:bold; border:none; cursor:pointer; }
-    ul { list-style:none; padding:0; }
-    li { background:#fff; margin:10px 0; padding:15px; border-left: 5px solid #28a745; border-radius:4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-    .financeiro { background:#fff; padding:15px; border-radius:8px; margin-bottom:15px; }
+    .btn-aceitar { background:#0077cc; margin-top:10px; }
   </style>
 </head>
 <body>
   <h1>Painel do Motorista</h1>
 
   <div id="authScreen" class="screen active">
-    <input id="email" type="email" placeholder="Email do Motorista">
-    <input id="password" type="password" placeholder="Senha">
-    <button onclick="login()">Entrar no Painel</button>
-    <button onclick="register()" style="background:#6c757d;">Cadastrar Novo Motorista</button>
+    <div class="card">
+      <h3>Dados Pessoais e Veículo</h3>
+      <input id="email" type="email" placeholder="Email">
+      <input id="password" type="password" placeholder="Senha">
+      <hr>
+      <input id="nome" placeholder="Seu Nome Completo">
+      <input id="modelo" placeholder="Modelo do Carro (Ex: Renegade)">
+      <input id="cor" placeholder="Cor do Carro">
+      <input id="placa" placeholder="Placa">
+      <button onclick="registrarMotorista()">Cadastrar Motorista</button>
+      <button onclick="loginMotorista()" style="background:#6c757d;">Já sou cadastrado (Entrar)</button>
+    </div>
   </div>
 
   <div id="appScreen" class="screen">
-    <div class="financeiro">
-        <strong>Resumo de Hoje:</strong>
-        <p>Ganhos Brutos: R$ <span id="ganhos">0.00</span></p>
-        <p>Taxa (20%): R$ <span id="taxa">0.00</span></p>
-        <p style="color:green; font-weight:bold;">Seu Lucro: R$ <span id="lucro">0.00</span></p>
-    </div>
-    <h3>Corridas Disponíveis</h3>
-    <ul id="listaCorridas"></ul>
+    <h3>Chamadas em Aberto</h3>
+    <div id="listaChamadas"></div>
   </div>
 
   <script>
@@ -50,52 +49,60 @@
         projectId: "myproject26-10f0e",
     };
     firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
     const db = firebase.database();
 
-    function login() {
-        const e = document.getElementById("email").value;
-        const p = document.getElementById("password").value;
-        firebase.auth().signInWithEmailAndPassword(e, p)
-            .then(() => { 
-                document.getElementById('authScreen').classList.remove('active');
-                document.getElementById('appScreen').classList.add('active');
-                carregarPedidos();
-            }).catch(err => alert(err.message));
-    }
+    function registrarMotorista() {
+      const dados = {
+        nome: document.getElementById("nome").value,
+        modelo: document.getElementById("modelo").value,
+        cor: document.getElementById("cor").value,
+        placa: document.getElementById("placa").value
+      };
 
-    function register() {
-        const e = document.getElementById("email").value;
-        const p = document.getElementById("password").value;
-        firebase.auth().createUserWithEmailAndPassword(e, p).then(() => alert("Motorista Cadastrado!"));
-    }
-
-    function carregarPedidos() {
-        db.ref("corridas").on("value", snap => {
-            const lista = document.getElementById("listaCorridas");
-            lista.innerHTML = "";
-            let total = 0;
-            snap.forEach(c => {
-                const d = c.val();
-                if(d.status === "finalizada") total += d.valor;
-                
-                const li = document.createElement("li");
-                li.innerHTML = `
-                    <b>Destino:</b> ${d.destino}<br>
-                    <b>Valor:</b> R$ ${d.valor}<br>
-                    <b>Passageiro:</b> ${d.usuario}<br>
-                    <small>${d.horario}</small>
-                `;
-                lista.appendChild(li);
-            });
-            atualizarFinanceiro(total);
+      auth.createUserWithEmailAndPassword(email.value, password.value).then(userCred => {
+        db.ref("usuarios/motoristas/" + userCred.user.uid).set(dados).then(() => {
+          alert("Motorista cadastrado com sucesso!");
+          entrar();
         });
+      }).catch(e => alert(e.message));
     }
 
-    function atualizarFinanceiro(bruto) {
-        const t = bruto * 0.20;
-        document.getElementById("ganhos").innerText = bruto.toFixed(2);
-        document.getElementById("taxa").innerText = t.toFixed(2);
-        document.getElementById("lucro").innerText = (bruto - t).toFixed(2);
+    function loginMotorista() {
+      auth.signInWithEmailAndPassword(email.value, password.value).then(() => entrar()).catch(e => alert(e.message));
+    }
+
+    function entrar() {
+      document.getElementById('authScreen').classList.remove('active');
+      document.getElementById('appScreen').classList.add('active');
+      ouvirCorridas();
+    }
+
+    function ouvirCorridas() {
+      db.ref("corridas_ativas").on("value", snap => {
+        const lista = document.getElementById("listaChamadas");
+        lista.innerHTML = "";
+        snap.forEach(corridaSnap => {
+          const c = corridaSnap.val();
+          if(c.status === "aguardando") {
+            const div = document.createElement("div");
+            div.className = "card";
+            div.innerHTML = `
+              <strong>Destino: ${c.destino}</strong><br>
+              Passageiro: ${c.passageiroEmail}<br>
+              <button class="btn-aceitar" onclick="aceitarCorrida('${corridaSnap.key}')">ACEITAR CORRIDA</button>
+            `;
+            lista.appendChild(div);
+          }
+        });
+      });
+    }
+
+    function aceitarCorrida(idPassageiro) {
+      db.ref("corridas_ativas/" + idPassageiro).update({
+        status: "Motorista a caminho",
+        motoristaId: auth.currentUser.uid
+      }).then(() => alert("Corrida aceita! Vá ao encontro do passageiro."));
     }
   </script>
 </body>
