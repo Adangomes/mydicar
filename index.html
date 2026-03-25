@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Medicar Passageiro</title>
+  <title>Medicar - Passageiro</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <style>
@@ -14,45 +14,40 @@
     h1 { background:#0077cc; color:#fff; padding:15px; margin:0; text-align:center; }
     .screen { display:none; padding:20px; }
     .active { display:block; }
-    input, button { width:100%; padding:12px; margin:8px 0; border-radius:8px; border:1px solid #ccc; font-size:16px; }
-    button { background:#0077cc; color:#fff; font-weight:bold; }
+    input, button { width:100%; padding:12px; margin:8px 0; border-radius:8px; border:1px solid #ccc; font-size:16px; box-sizing: border-box; }
+    button { background:#0077cc; color:#fff; font-weight:bold; cursor:pointer; border:none; }
     button:hover { background:#005fa3; }
     ul { list-style:none; padding:0; }
     li { background:#fff; margin:5px 0; padding:10px; border-radius:5px; border:1px solid #ddd; }
-    #map { height:400px; width:100%; border-radius:8px; margin-top:15px; }
+    #map { height:300px; width:100%; border-radius:8px; margin-top:15px; }
   </style>
 </head>
 <body>
-  <h1>Medicar  - Passageiro</h1>
+  <h1>Medicar - Passageiro</h1>
 
-  <!-- Tela de login/cadastro -->
   <div id="authScreen" class="screen active">
-    <h2>Entrar</h2>
-    <input id="email" placeholder="Email">
-    <input id="password" type="password" placeholder="Senha">
-    <button onclick="register()">Cadastrar</button>
-    <button onclick="login()">Login</button>
-    <button onclick="resetPassword()">Esqueci a senha</button>
+    <h2>Entrar / Cadastrar</h2>
+    <input id="email" type="email" placeholder="Seu Email">
+    <input id="password" type="password" placeholder="Sua Senha">
+    <button onclick="register()">Cadastrar Novo Usuário</button>
+    <button onclick="login()" style="background:#28a745;">Entrar</button>
   </div>
 
-  <!-- Tela principal -->
   <div id="appScreen" class="screen">
     <h2>Solicitar Corrida</h2>
-    <input id="destino" placeholder="Destino (Jaraguá, Guaramirim, Schroeder)">
-    <button onclick="solicitarCorrida()">Solicitar Corrida</button>
-
+    <input id="destino" placeholder="Destino (Ex: Jaraguá, Guaramirim)">
+    <button onclick="solicitarCorrida()">Solicitar Agora</button>
     <h3>Minhas Corridas</h3>
     <ul id="minhasCorridas"></ul>
-
     <div id="map"></div>
   </div>
 
   <script>
     const firebaseConfig = {
-      apiKey: "YOUR_FIREBASE_API_KEY",
-      authDomain: "YOUR_PROJECT.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-      databaseURL: "https://YOUR_PROJECT.firebaseio.com",
+        apiKey: "AIzaSyCXA1yP1F-riNkzOX5zJs5gsQ82EzsT7Qg",
+        authDomain: "myproject26-10f0e.firebaseapp.com",
+        databaseURL: "https://myproject26-10f0e-default-rtdb.firebaseio.com",
+        projectId: "myproject26-10f0e",
     };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
@@ -64,43 +59,34 @@
     }
 
     function register() {
-      auth.createUserWithEmailAndPassword(
-        email.value, password.value
-      ).then(() => {
-        alert("Usuário cadastrado! Verifique seu email.");
-        auth.currentUser.sendEmailVerification();
-      });
+      const e = document.getElementById("email").value;
+      const p = document.getElementById("password").value;
+      auth.createUserWithEmailAndPassword(e, p)
+        .then(() => alert("Cadastrado! Agora faça o login."))
+        .catch(err => alert("Erro: " + err.message));
     }
+
     function login() {
-      auth.signInWithEmailAndPassword(email.value, password.value).then(() => {
-        showScreen("appScreen");
-        carregarCorridas();
-      });
-    }
-    function resetPassword() {
-      auth.sendPasswordResetEmail(email.value).then(() => alert("Email enviado!"));
+      const e = document.getElementById("email").value;
+      const p = document.getElementById("password").value;
+      auth.signInWithEmailAndPassword(e, p)
+        .then(() => { showScreen("appScreen"); carregarCorridas(); })
+        .catch(err => alert("Erro: " + err.message));
     }
 
     function solicitarCorrida() {
-      const destino = destinoInput.value.toLowerCase();
-      if (!["jaraguá do sul","guaramirim","schroeder"].some(c => destino.includes(c))) {
-        return alert("Localização inválida!");
-      }
-      const valor = calcularValor(destino);
+      const destino = document.getElementById("destino").value.toLowerCase();
+      if (!destino) return alert("Digite um destino");
+      
+      const valor = destino.includes("guaramirim") ? 15 : (destino.includes("schroeder") ? 18 : 10);
+      
       realtime.ref("corridas").push({
         usuario: auth.currentUser.email,
         destino: destino,
         status: "aguardando",
         valor: valor,
         horario: new Date().toLocaleString()
-      });
-      alert("Corrida solicitada! Valor: R$ " + valor);
-    }
-
-    function calcularValor(destino) {
-      if (destino.includes("guaramirim")) return 15;
-      if (destino.includes("schroeder")) return 18;
-      return 10;
+      }).then(() => alert("Corrida solicitada! Valor estimado: R$ " + valor));
     }
 
     function carregarCorridas() {
@@ -108,18 +94,16 @@
         const lista = document.getElementById("minhasCorridas");
         lista.innerHTML = "";
         snap.forEach(c => {
-          const dados = c.val();
+          const d = c.val();
           const li = document.createElement("li");
-          li.innerText = `${dados.destino} - R$${dados.valor} - ${dados.status} - ${dados.horario}`;
+          li.innerText = `${d.destino} - R$ ${d.valor} (${d.status})`;
           lista.appendChild(li);
         });
       });
     }
 
-    const destinoInput = document.getElementById("destino");
-    const map = L.map('map').setView([-26.47, -49.08], 12);
-    L.tileLayer(`https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}.png?apiKey=YOUR_GEOAPIFY_API_KEY`, {
-      attribution: '© OpenStreetMap contributors © Geoapify',
+    const map = L.map('map').setView([-26.48, -49.07], 13);
+    L.tileLayer('https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}.png?apiKey=208f6874a48c45e68761f3d994db6775', {
       maxZoom: 20
     }).addTo(map);
   </script>
