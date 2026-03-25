@@ -149,20 +149,19 @@
     }
 
     function pedirCorrida() {
-      const dest = document.getElementById('destino_input').value;
-      if(!dest || !userPos) return alert("Diga o destino e ative o GPS!");
+  const dest = document.getElementById('destino_input').value;
+  
+  if (!userPos) {
+    return alert("O GPS ainda não localizou você. Aguarde um segundo ou verifique se permitiu o acesso à localização.");
+  }
+  if (!dest) {
+    return alert("Por favor, digite para onde você quer ir.");
+  }
 
-      const id = auth.currentUser.uid;
-      db.ref("corridas_ativas/" + id).set({
-        passageiroId: id,
-        origem: { lat: userPos[0], lng: userPos[1] },
-        destinoNome: dest,
-        status: "aguardando",
-        timestamp: Date.now()
-      }).then(() => {
-        document.getElementById('statusCard').style.display = "block";
-      });
-    }
+  // Se chegou aqui, as duas informações existem!
+  const id = auth.currentUser.uid;
+  // ... resto do código
+}
 
     function escutarCorridas() {
       const id = auth.currentUser.uid;
