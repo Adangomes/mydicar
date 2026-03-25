@@ -15,7 +15,6 @@
     .card { background:#fff; padding:15px; border-radius:10px; margin-bottom:15px; box-shadow:0 2px 5px rgba(0,0,0,0.1); }
     input, button { width:100%; padding:12px; margin:5px 0; border-radius:8px; border:1px solid #ccc; box-sizing:border-box; }
     button { background:#28a745; color:#fff; font-weight:bold; border:none; cursor:pointer; }
-    .btn-aceitar { background:#0077cc; margin-top:10px; }
   </style>
 </head>
 <body>
@@ -23,21 +22,20 @@
 
   <div id="authScreen" class="screen active">
     <div class="card">
-      <h3>Dados Pessoais e Veículo</h3>
       <input id="email" type="email" placeholder="Email">
       <input id="password" type="password" placeholder="Senha">
       <hr>
-      <input id="nome" placeholder="Seu Nome Completo">
-      <input id="modelo" placeholder="Modelo do Carro (Ex: Renegade)">
-      <input id="cor" placeholder="Cor do Carro">
+      <input id="nome" placeholder="Nome Completo">
+      <input id="modelo" placeholder="Modelo do Carro">
+      <input id="cor" placeholder="Cor">
       <input id="placa" placeholder="Placa">
-      <button onclick="registrarMotorista()">Cadastrar Motorista</button>
-      <button onclick="loginMotorista()" style="background:#6c757d;">Já sou cadastrado (Entrar)</button>
+      <button onclick="registrar()">Cadastrar e Entrar</button>
     </div>
   </div>
 
   <div id="appScreen" class="screen">
-    <h3>Chamadas em Aberto</h3>
+    <div class="card" style="background:#fff3cd;">📍 Você está online e sendo rastreado</div>
+    <h3>Chamadas Próximas</h3>
     <div id="listaChamadas"></div>
   </div>
 
@@ -52,57 +50,54 @@
     const auth = firebase.auth();
     const db = firebase.database();
 
-    function registrarMotorista() {
-      const dados = {
-        nome: document.getElementById("nome").value,
-        modelo: document.getElementById("modelo").value,
-        cor: document.getElementById("cor").value,
-        placa: document.getElementById("placa").value
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        document.getElementById('authScreen').classList.remove('active');
+        document.getElementById('appScreen').classList.add('active');
+        iniciarRastreamento();
+        ouvirCorridas();
+      }
+    });
+
+    function registrar() {
+      const info = {
+        nome: nome.value, modelo: modelo.value, cor: cor.value, placa: placa.value
       };
+      auth.createUserWithEmailAndPassword(email.value, password.value).then(res => {
+        db.ref("usuarios/motoristas/" + res.user.uid).set(info);
+      });
+    }
 
-      auth.createUserWithEmailAndPassword(email.value, password.value).then(userCred => {
-        db.ref("usuarios/motoristas/" + userCred.user.uid).set(dados).then(() => {
-          alert("Motorista cadastrado com sucesso!");
-          entrar();
+    function iniciarRastreamento() {
+      navigator.geolocation.watchPosition(pos => {
+        db.ref("usuarios/motoristas/" + auth.currentUser.uid + "/posicao").set({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude
         });
-      }).catch(e => alert(e.message));
-    }
-
-    function loginMotorista() {
-      auth.signInWithEmailAndPassword(email.value, password.value).then(() => entrar()).catch(e => alert(e.message));
-    }
-
-    function entrar() {
-      document.getElementById('authScreen').classList.remove('active');
-      document.getElementById('appScreen').classList.add('active');
-      ouvirCorridas();
+      }, null, { enableHighAccuracy: true });
     }
 
     function ouvirCorridas() {
       db.ref("corridas_ativas").on("value", snap => {
         const lista = document.getElementById("listaChamadas");
         lista.innerHTML = "";
-        snap.forEach(corridaSnap => {
-          const c = corridaSnap.val();
+        snap.forEach(cSnap => {
+          const c = cSnap.val();
           if(c.status === "aguardando") {
             const div = document.createElement("div");
             div.className = "card";
-            div.innerHTML = `
-              <strong>Destino: ${c.destino}</strong><br>
-              Passageiro: ${c.passageiroEmail}<br>
-              <button class="btn-aceitar" onclick="aceitarCorrida('${corridaSnap.key}')">ACEITAR CORRIDA</button>
-            `;
+            div.innerHTML = `<b>Destino:</b> ${c.destinoNome}<br><button onclick="aceitar('${cSnap.key}')">ACEITAR</button>`;
             lista.appendChild(div);
           }
         });
       });
     }
 
-    function aceitarCorrida(idPassageiro) {
-      db.ref("corridas_ativas/" + idPassageiro).update({
+    function aceitar(id) {
+      db.ref("corridas_ativas/" + id).update({
         status: "Motorista a caminho",
         motoristaId: auth.currentUser.uid
-      }).then(() => alert("Corrida aceita! Vá ao encontro do passageiro."));
+      }).then(() => alert("Corrida aceita! O passageiro já está te vendo no mapa."));
     }
   </script>
 </body>
