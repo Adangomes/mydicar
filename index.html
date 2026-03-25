@@ -7,55 +7,67 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+  
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  
   <style>
-    body { font-family: 'Segoe UI', Arial, sans-serif; margin:0; background:#f0f2f5; }
+    body { font-family: 'Segoe UI', sans-serif; margin:0; background:#f4f7f6; }
     h1 { background:#0077cc; color:#fff; padding:15px; margin:0; text-align:center; font-size: 20px; }
     .screen { display:none; padding:15px; }
     .active { display:block; }
-    .card { background:#fff; padding:15px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.1); margin-bottom:15px; }
-    input, button { width:100%; padding:12px; margin:8px 0; border-radius:8px; border:1px solid #ccc; font-size:16px; box-sizing: border-box; }
-    button { background:#0077cc; color:#fff; font-weight:bold; border:none; cursor:pointer; }
-    .google-btn { background: #fff; color: #444; border: 1px solid #ddd; display: flex; align-items: center; justify-content: center; gap: 10px; }
-    .driver-info { background:#e7f3ff; border: 1px solid #0077cc; padding:10px; border-radius:8px; margin-top:10px; display:none; }
-    #map { height:350px; width:100%; border-radius:12px; margin-top:15px; }
+    .card { background:#fff; padding:15px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); margin-bottom:15px; }
+    input, button { width:100%; padding:14px; margin:8px 0; border-radius:8px; border:1px solid #ddd; font-size:16px; box-sizing: border-box; }
+    button { background:#0077cc; color:#fff; font-weight:bold; border:none; cursor:pointer; transition: 0.3s; }
+    button:active { transform: scale(0.98); }
+    .google-btn { background: #fff; color: #444; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; gap: 10px; }
+    #map { height:300px; width:100%; border-radius:12px; margin-top:15px; border: 2px solid #fff; }
+    .driver-box { background:#e7f3ff; padding:12px; border-radius:8px; border-left: 5px solid #0077cc; margin-top:10px; display:none; }
   </style>
 </head>
 <body>
-  <h1>Mydi Car - Passageiro</h1>
+
+  <h1>Mydi Car</h1>
 
   <div id="authScreen" class="screen active">
     <div class="card">
-      <input id="email" type="email" placeholder="Seu Email">
-      <input id="password" type="password" placeholder="Sua Senha">
-      <button onclick="login()">Entrar</button>
+      <h2 style="text-align:center; color:#333;">Bem-vindo</h2>
+      <input id="reg_email" type="email" placeholder="E-mail">
+      <input id="reg_password" type="password" placeholder="Senha">
+      
+      <button onclick="fazerLogin()">Entrar</button>
+      <button onclick="criarConta()" style="background:#6c757d;">Cadastrar E-mail</button>
+      
+      <div style="text-align:center; margin:10px 0; color:#888;">OU</div>
+      
       <button onclick="loginGoogle()" class="google-btn">
-        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18"> Entrar com Google
+        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18"> 
+        Entrar com Google
       </button>
-      <button onclick="register()" style="background:#6c757d;">Criar Conta E-mail</button>
     </div>
   </div>
 
   <div id="appScreen" class="screen">
     <div class="card">
-      <input id="destino" placeholder="Para onde vamos? (Ex: Centro)">
-      <button onclick="solicitarCorrida()">Solicitar Corrida</button>
-      <button onclick="auth.signOut(); location.reload();" style="background:#ff4444; margin-top:10px;">Sair</button>
+      <input id="destino_input" placeholder="Para onde vamos?">
+      <button onclick="pedirCorrida()">Solicitar Agora</button>
+      <button onclick="deslogar()" style="background:#ff4444; margin-top:10px; padding:8px; font-size:12px;">Sair da Conta</button>
     </div>
 
-    <div id="infoCorrida" class="card" style="display:none;">
-      <strong>Status: <span id="statusTxt">Aguardando...</span></strong>
-      <div id="detalhesMotorista" class="driver-info">
-        <p><b>Motorista:</b> <span id="nomeMot"></span></p>
-        <p><b>Carro:</b> <span id="carroMot"></span> (<span id="corMot"></span>)</p>
-        <p><b>Placa:</b> <span id="placaMot"></span></p>
+    <div id="statusCard" class="card" style="display:none;">
+      <strong>Status: <span id="statusLabel">Aguardando...</span></strong>
+      <div id="boxMotorista" class="driver-box">
+        <p style="margin:5px 0;">🚗 <b id="nomeM"></b></p>
+        <p style="margin:5px 0;">🚙 <span id="carroM"></span> - <span id="corM"></span></p>
+        <p style="margin:5px 0;">🆔 Placa: <b id="placaM"></b></p>
       </div>
     </div>
+    
     <div id="map"></div>
   </div>
 
   <script>
+    // Configurações do seu Firebase
     const firebaseConfig = {
         apiKey: "AIzaSyCXA1yP1F-riNkzOX5zJs5gsQ82EzsT7Qg",
         authDomain: "myproject26-10f0e.firebaseapp.com",
@@ -67,103 +79,143 @@
     const db = firebase.database();
 
     let userPos = null;
-    let driverMarker = null;
-    let routingLayer = null;
+    let markerMotorista = null;
+    let linhaRota = null;
+    const mapa = L.map('map').setView([-26.48, -49.07], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapa);
 
-    // Inicializar Mapa
-    const map = L.map('map').setView([-26.48, -49.07], 14);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    // --- FUNÇÕES DE AUTENTICAÇÃO ---
 
-    // Identificar usuário logado automaticamente
+    function criarConta() {
+      const email = document.getElementById('reg_email').value;
+      const pass = document.getElementById('reg_password').value;
+      
+      auth.createUserWithEmailAndPassword(email, pass)
+        .then(res => {
+          alert("Conta criada!");
+          salvarDadosNoBanco(res.user);
+        })
+        .catch(err => alert("Erro ao criar: " + err.message));
+    }
+
+    function fazerLogin() {
+      const email = document.getElementById('reg_email').value;
+      const pass = document.getElementById('reg_password').value;
+      
+      auth.signInWithEmailAndPassword(email, pass)
+        .catch(err => alert("Erro ao entrar: " + err.message));
+    }
+
+    function loginGoogle() {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      auth.signInWithPopup(provider)
+        .then(res => salvarDadosNoBanco(res.user))
+        .catch(err => {
+          console.error(err);
+          alert("Erro Google: Verifique se ativou o Google no Console do Firebase e se o domínio está autorizado.");
+        });
+    }
+
+    function deslogar() {
+      auth.signOut().then(() => location.reload());
+    }
+
+    function salvarDadosNoBanco(user) {
+      db.ref("usuarios/passageiros/" + user.uid).set({
+        nome: user.displayName || "Novo Passageiro",
+        email: user.email,
+        tipo: "passageiro",
+        criadoEm: Date.now()
+      });
+    }
+
+    // --- LOGICA DO APP ---
+
     auth.onAuthStateChanged(user => {
       if (user) {
         document.getElementById('authScreen').classList.remove('active');
         document.getElementById('appScreen').classList.add('active');
-        obterLocalizacao();
-        monitorarMinhaCorrida();
+        comecarRastreioPassageiro();
+        escutarCorridas();
       }
     });
 
-    function loginGoogle() {
-      const provider = new firebase.auth.GoogleAuthProvider();
-      auth.signInWithPopup(provider).then(res => salvarDadosUsuario(res.user));
-    }
-
-    function login() {
-      auth.signInWithEmailAndPassword(email.value, password.value).catch(e => alert(e.message));
-    }
-
-    function register() {
-      auth.createUserWithEmailAndPassword(email.value, password.value).then(res => salvarDadosUsuario(res.user));
-    }
-
-    function salvarDadosUsuario(user) {
-      db.ref("usuarios/passageiros/" + user.uid).update({
-        nome: user.displayName || "Passageiro",
-        email: user.email,
-        tipo: "passageiro"
-      });
-    }
-
-    function obterLocalizacao() {
+    function comecarRastreioPassageiro() {
       navigator.geolocation.watchPosition(pos => {
         userPos = [pos.coords.latitude, pos.coords.longitude];
-        map.setView(userPos);
-        L.marker(userPos).addTo(map).bindPopup("Você está aqui").openPopup();
-      });
+        mapa.setView(userPos);
+        L.marker(userPos).addTo(mapa).bindPopup("Você").openPopup();
+      }, err => console.error("Erro GPS", err), { enableHighAccuracy: true });
     }
 
-    function solicitarCorrida() {
-      const dest = document.getElementById("destino").value;
-      if(!dest || !userPos) return alert("Aguarde a localização ou digite o destino");
-      
-      db.ref("corridas_ativas/" + auth.currentUser.uid).set({
-        passageiroId: auth.currentUser.uid,
+    function pedirCorrida() {
+      const dest = document.getElementById('destino_input').value;
+      if(!dest || !userPos) return alert("Diga o destino e ative o GPS!");
+
+      const id = auth.currentUser.uid;
+      db.ref("corridas_ativas/" + id).set({
+        passageiroId: id,
         origem: { lat: userPos[0], lng: userPos[1] },
         destinoNome: dest,
         status: "aguardando",
         timestamp: Date.now()
+      }).then(() => {
+        document.getElementById('statusCard').style.display = "block";
       });
-      document.getElementById("infoCorrida").style.display = "block";
     }
 
-    function monitorarMinhaCorrida() {
-      db.ref("corridas_ativas/" + auth.currentUser.uid).on("value", snap => {
-        const c = snap.val();
-        if(!c) return;
-        document.getElementById("statusTxt").innerText = c.status;
+    function escutarCorridas() {
+      const id = auth.currentUser.uid;
+      db.ref("corridas_ativas/" + id).on("value", snap => {
+        const dados = snap.val();
+        if(!dados) return;
 
-        if(c.motoristaId) {
-          db.ref("usuarios/motoristas/" + c.motoristaId).on("value", mSnap => {
+        document.getElementById('statusLabel').innerText = dados.status;
+
+        if(dados.motoristaId) {
+          // Busca dados do motorista na pasta específica
+          db.ref("usuarios/motoristas/" + dados.motoristaId).on("value", mSnap => {
             const m = mSnap.val();
-            document.getElementById("detalhesMotorista").style.display = "block";
-            document.getElementById("nomeMot").innerText = m.nome;
-            document.getElementById("carroMot").innerText = m.modelo;
-            document.getElementById("corMot").innerText = m.cor;
-            document.getElementById("placaMot").innerText = m.placa;
+            if(!m) return;
+            
+            document.getElementById('boxMotorista').style.display = "block";
+            document.getElementById('nomeM').innerText = m.nome;
+            document.getElementById('carroM').innerText = m.modelo;
+            document.getElementById('corM').innerText = m.cor;
+            document.getElementById('placaM').innerText = m.placa;
 
             if(m.posicao) {
-               atualizarPosicaoMotorista(m.posicao.lat, m.posicao.lng);
+              moverMotoristaNoMapa(m.posicao.lat, m.posicao.lng);
             }
           });
         }
       });
     }
 
-    function atualizarPosicaoMotorista(lat, lng) {
-      if(driverMarker) map.removeLayer(driverMarker);
-      driverMarker = L.marker([lat, lng], {icon: L.icon({iconUrl: 'https://cdn-icons-png.flaticon.com/512/3202/3202926.png', iconSize: [30,30]})}).addTo(map);
-      desenharRota(lat, lng);
+    function moverMotoristaNoMapa(lat, lng) {
+      if(markerMotorista) mapa.removeLayer(markerMotorista);
+      
+      const carIcon = L.icon({
+        iconUrl: 'https://cdn-icons-png.flaticon.com/512/3202/3202926.png',
+        iconSize: [35, 35]
+      });
+
+      markerMotorista = L.marker([lat, lng], { icon: carIcon }).addTo(mapa);
+      trazarRota(lat, lng);
     }
 
-    function desenharRota(mLat, mLng) {
-      if(routingLayer) map.removeLayer(routingLayer);
+    function trazarRota(mLat, mLng) {
+      if(linhaRota) mapa.removeLayer(linhaRota);
+      
+      // OSRM API (Leva as coords em Longitude, Latitude)
       const url = `https://router.project-osrm.org/route/v1/driving/${mLng},${mLat};${userPos[1]},${userPos[0]}?overview=full&geometries=geojson`;
       
-      fetch(url).then(r => r.json()).then(data => {
-        const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-        routingLayer = L.polyline(coords, {color: '#0077cc', weight: 5}).addTo(map);
-      });
+      fetch(url)
+        .then(r => r.json())
+        .then(res => {
+          const coords = res.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+          linhaRota = L.polyline(coords, { color: '#0077cc', weight: 6, opacity: 0.7 }).addTo(mapa);
+        });
     }
   </script>
 </body>
