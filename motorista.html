@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Medicar Motorista</title>
+  <title>Medicar - Motorista</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <style>
@@ -14,37 +14,89 @@
     h1 { background:#28a745; color:#fff; padding:15px; margin:0; text-align:center; }
     .screen { display:none; padding:20px; }
     .active { display:block; }
-    input, button { width:100%; padding:12px; margin:8px 0; border-radius:8px; border:1px solid #ccc; font-size:16px; }
-    button { background:#28a745; color:#fff; font-weight:bold; }
-    button:hover { background:#1e7e34; }
+    input, button { width:100%; padding:12px; margin:8px 0; border-radius:8px; border:1px solid #ccc; font-size:16px; box-sizing: border-box; }
+    button { background:#28a745; color:#fff; font-weight:bold; border:none; cursor:pointer; }
     ul { list-style:none; padding:0; }
-    li { background:#fff; margin:5px 0; padding:10px; border-radius:5px; border:1px solid #ddd; }
-    #map { height:400px; width:100%; border-radius:8px; margin-top:15px; }
+    li { background:#fff; margin:10px 0; padding:15px; border-left: 5px solid #28a745; border-radius:4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .financeiro { background:#fff; padding:15px; border-radius:8px; margin-bottom:15px; }
   </style>
 </head>
 <body>
-  <h1>Área do Motorista </h1>
+  <h1>Painel do Motorista</h1>
 
-  <!-- Tela de login/cadastro -->
   <div id="authScreen" class="screen active">
-    <h2>Entrar</h2>
-    <input id="email" placeholder="Email">
+    <input id="email" type="email" placeholder="Email do Motorista">
     <input id="password" type="password" placeholder="Senha">
-    <button onclick="register()">Cadastrar</button>
-    <button onclick="login()">Login</button>
-    <button onclick="resetPassword()">Esqueci a senha</button>
+    <button onclick="login()">Entrar no Painel</button>
+    <button onclick="register()" style="background:#6c757d;">Cadastrar Novo Motorista</button>
   </div>
 
-  <!-- Tela principal -->
   <div id="appScreen" class="screen">
-    <button onclick="ficarOnline()">Ficar Online</button>
-    <h3>Minhas Corridas</h3>
-    <ul id="minhasCorridas"></ul>
-    <p>Ganhos do dia: R$ <span id="ganhosDia">0</span></p>
-    <p>Ganhos totais: R$ <span id="ganhosTotais">0</span></p>
-    <p>Taxa da plataforma (20%): R$ <span id="taxa">0</span></p>
-    <p>Lucro líquido: R$ <span id="lucro">0</span></p>
-    <div id="map"></div>
+    <div class="financeiro">
+        <strong>Resumo de Hoje:</strong>
+        <p>Ganhos Brutos: R$ <span id="ganhos">0.00</span></p>
+        <p>Taxa (20%): R$ <span id="taxa">0.00</span></p>
+        <p style="color:green; font-weight:bold;">Seu Lucro: R$ <span id="lucro">0.00</span></p>
+    </div>
+    <h3>Corridas Disponíveis</h3>
+    <ul id="listaCorridas"></ul>
   </div>
 
- 
+  <script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyCXA1yP1F-riNkzOX5zJs5gsQ82EzsT7Qg",
+        authDomain: "myproject26-10f0e.firebaseapp.com",
+        databaseURL: "https://myproject26-10f0e-default-rtdb.firebaseio.com",
+        projectId: "myproject26-10f0e",
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    function login() {
+        const e = document.getElementById("email").value;
+        const p = document.getElementById("password").value;
+        firebase.auth().signInWithEmailAndPassword(e, p)
+            .then(() => { 
+                document.getElementById('authScreen').classList.remove('active');
+                document.getElementById('appScreen').classList.add('active');
+                carregarPedidos();
+            }).catch(err => alert(err.message));
+    }
+
+    function register() {
+        const e = document.getElementById("email").value;
+        const p = document.getElementById("password").value;
+        firebase.auth().createUserWithEmailAndPassword(e, p).then(() => alert("Motorista Cadastrado!"));
+    }
+
+    function carregarPedidos() {
+        db.ref("corridas").on("value", snap => {
+            const lista = document.getElementById("listaCorridas");
+            lista.innerHTML = "";
+            let total = 0;
+            snap.forEach(c => {
+                const d = c.val();
+                if(d.status === "finalizada") total += d.valor;
+                
+                const li = document.createElement("li");
+                li.innerHTML = `
+                    <b>Destino:</b> ${d.destino}<br>
+                    <b>Valor:</b> R$ ${d.valor}<br>
+                    <b>Passageiro:</b> ${d.usuario}<br>
+                    <small>${d.horario}</small>
+                `;
+                lista.appendChild(li);
+            });
+            atualizarFinanceiro(total);
+        });
+    }
+
+    function atualizarFinanceiro(bruto) {
+        const t = bruto * 0.20;
+        document.getElementById("ganhos").innerText = bruto.toFixed(2);
+        document.getElementById("taxa").innerText = t.toFixed(2);
+        document.getElementById("lucro").innerText = (bruto - t).toFixed(2);
+    }
+  </script>
+</body>
+</html>
