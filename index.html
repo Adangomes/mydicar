@@ -17,8 +17,9 @@
     .card { background:#fff; padding:15px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.1); margin-bottom:15px; }
     input, button { width:100%; padding:12px; margin:8px 0; border-radius:8px; border:1px solid #ccc; font-size:16px; box-sizing: border-box; }
     button { background:#0077cc; color:#fff; font-weight:bold; border:none; cursor:pointer; }
+    .google-btn { background: #fff; color: #444; border: 1px solid #ddd; display: flex; align-items: center; justify-content: center; gap: 10px; }
     .driver-info { background:#e7f3ff; border: 1px solid #0077cc; padding:10px; border-radius:8px; margin-top:10px; display:none; }
-    #map { height:250px; width:100%; border-radius:12px; margin-top:15px; }
+    #map { height:350px; width:100%; border-radius:12px; margin-top:15px; }
   </style>
 </head>
 <body>
@@ -29,7 +30,10 @@
       <input id="email" type="email" placeholder="Seu Email">
       <input id="password" type="password" placeholder="Sua Senha">
       <button onclick="login()">Entrar</button>
-      <button onclick="register()" style="background:#6c757d;">Criar Conta</button>
+      <button onclick="loginGoogle()" class="google-btn">
+        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18"> Entrar com Google
+      </button>
+      <button onclick="register()" style="background:#6c757d;">Criar Conta E-mail</button>
     </div>
   </div>
 
@@ -37,17 +41,17 @@
     <div class="card">
       <input id="destino" placeholder="Para onde vamos? (Ex: Centro)">
       <button onclick="solicitarCorrida()">Solicitar Corrida</button>
+      <button onclick="auth.signOut(); location.reload();" style="background:#ff4444; margin-top:10px;">Sair</button>
     </div>
 
     <div id="infoCorrida" class="card" style="display:none;">
       <strong>Status: <span id="statusTxt">Aguardando...</span></strong>
       <div id="detalhesMotorista" class="driver-info">
-        <p><b>Motorista:</b> <span id="nomeMot"></span></p>
-        <p><b>Carro:</b> <span id="carroMot"></span> (<span id="corMot"></span>)</p>
-        <p><b>Placa:</b> <span id="placaMot"></span></p>
+        <p>🚗 <b>Motorista:</b> <span id="nomeMot"></span></p>
+        <p>🚙 <b>Carro:</b> <span id="carroMot"></span> (<span id="corMot"></span>)</p>
+        <p>🆔 <b>Placa:</b> <span id="placaMot"></span></p>
       </div>
     </div>
-
     <div id="map"></div>
   </div>
 
@@ -62,52 +66,105 @@
     const auth = firebase.auth();
     const db = firebase.database();
 
+    let userPos = null;
+    let driverMarker = null;
+    let routingLayer = null;
+
+    // Inicializar Mapa
+    const map = L.map('map').setView([-26.48, -49.07], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    // Identificar usuário logado automaticamente
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        document.getElementById('authScreen').classList.remove('active');
+        document.getElementById('appScreen').classList.add('active');
+        obterLocalizacao();
+        monitorarMinhaCorrida();
+      }
+    });
+
+    function loginGoogle() {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      auth.signInWithPopup(provider).then(res => salvarDadosUsuario(res.user));
+    }
+
     function login() {
-      auth.signInWithEmailAndPassword(email.value, password.value)
-        .then(() => { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById('appScreen').classList.add('active'); monitorarMinhaCorrida(); })
-        .catch(e => alert(e.message));
+      auth.signInWithEmailAndPassword(email.value, password.value).catch(e => alert(e.message));
     }
 
     function register() {
-      auth.createUserWithEmailAndPassword(email.value, password.value).then(() => alert("Conta criada!"));
+      auth.createUserWithEmailAndPassword(email.value, password.value).then(res => salvarDadosUsuario(res.user));
+    }
+
+    function salvarDadosUsuario(user) {
+      db.ref("usuarios/passageiros/" + user.uid).update({
+        nome: user.displayName || "Passageiro",
+        email: user.email,
+        tipo: "passageiro"
+      });
+    }
+
+    function obterLocalizacao() {
+      navigator.geolocation.watchPosition(pos => {
+        userPos = [pos.coords.latitude, pos.coords.longitude];
+        map.setView(userPos);
+        L.marker(userPos).addTo(map).bindPopup("Você está aqui").openPopup();
+      });
     }
 
     function solicitarCorrida() {
       const dest = document.getElementById("destino").value;
-      if(!dest) return alert("Digite o destino");
+      if(!dest || !userPos) return alert("Aguarde a localização ou digite o destino");
       
-      const novaCorrida = {
-        passageiroEmail: auth.currentUser.email,
-        destino: dest,
+      db.ref("corridas_ativas/" + auth.currentUser.uid).set({
+        passageiroId: auth.currentUser.uid,
+        origem: { lat: userPos[0], lng: userPos[1] },
+        destinoNome: dest,
         status: "aguardando",
-        valor: 12.50,
         timestamp: Date.now()
-      };
-      db.ref("corridas_ativas/" + auth.currentUser.uid).set(novaCorrida);
+      });
       document.getElementById("infoCorrida").style.display = "block";
     }
 
     function monitorarMinhaCorrida() {
       db.ref("corridas_ativas/" + auth.currentUser.uid).on("value", snap => {
-        const d = snap.val();
-        if(!d) return;
-        document.getElementById("statusTxt").innerText = d.status;
-        
-        if(d.motoristaId) {
-          db.ref("usuarios/motoristas/" + d.motoristaId).once("value", mSnap => {
+        const c = snap.val();
+        if(!c) return;
+        document.getElementById("statusTxt").innerText = c.status;
+
+        if(c.motoristaId) {
+          db.ref("usuarios/motoristas/" + c.motoristaId).on("value", mSnap => {
             const m = mSnap.val();
             document.getElementById("detalhesMotorista").style.display = "block";
             document.getElementById("nomeMot").innerText = m.nome;
             document.getElementById("carroMot").innerText = m.modelo;
             document.getElementById("corMot").innerText = m.cor;
             document.getElementById("placaMot").innerText = m.placa;
+
+            if(m.posicao) {
+               atualizarPosicaoMotorista(m.posicao.lat, m.posicao.lng);
+            }
           });
         }
       });
     }
 
-    const map = L.map('map').setView([-26.48, -49.07], 13);
-    L.tileLayer('https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}.png?apiKey=208f6874a48c45e68761f3d994db6775', { maxZoom: 20 }).addTo(map);
+    function atualizarPosicaoMotorista(lat, lng) {
+      if(driverMarker) map.removeLayer(driverMarker);
+      driverMarker = L.marker([lat, lng], {icon: L.icon({iconUrl: 'https://cdn-icons-png.flaticon.com/512/3202/3202926.png', iconSize: [30,30]})}).addTo(map);
+      desenharRota(lat, lng);
+    }
+
+    function desenharRota(mLat, mLng) {
+      if(routingLayer) map.removeLayer(routingLayer);
+      const url = `https://router.project-osrm.org/route/v1/driving/${mLng},${mLat};${userPos[1]},${userPos[0]}?overview=full&geometries=geojson`;
+      
+      fetch(url).then(r => r.json()).then(data => {
+        const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+        routingLayer = L.polyline(coords, {color: '#0077cc', weight: 5}).addTo(map);
+      });
+    }
   </script>
 </body>
 </html>
