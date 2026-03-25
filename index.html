@@ -7,10 +7,8 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
-  
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  
   <style>
     body { font-family: 'Segoe UI', sans-serif; margin:0; background:#f4f7f6; }
     h1 { background:#0077cc; color:#fff; padding:15px; margin:0; text-align:center; font-size: 20px; }
@@ -18,235 +16,110 @@
     .active { display:block; }
     .card { background:#fff; padding:15px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); margin-bottom:15px; }
     input, button { width:100%; padding:14px; margin:8px 0; border-radius:8px; border:1px solid #ddd; font-size:16px; box-sizing: border-box; }
-    button { background:#0077cc; color:#fff; font-weight:bold; border:none; cursor:pointer; transition: 0.3s; }
-    button:active { transform: scale(0.98); }
-    .google-btn { background: #fff; color: #444; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; gap: 10px; }
-    #map { height:300px; width:100%; border-radius:12px; margin-top:15px; border: 2px solid #fff; }
-    .driver-box { background:#e7f3ff; padding:12px; border-radius:8px; border-left: 5px solid #0077cc; margin-top:10px; display:none; }
-    
-    /* Push Visual para GPS */
-    #gpsHelper {
-        display: none;
-        position: fixed;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 90%;
-        background: #fff3cd;
-        color: #856404;
-        padding: 15px;
-        border-radius: 10px;
-        border: 1px solid #ffeeba;
-        z-index: 10000;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        text-align: center;
-    }
+    button { background:#0077cc; color:#fff; font-weight:bold; border:none; cursor:pointer; }
+    #map { height:250px; width:100%; border-radius:12px; margin-top:10px; }
+    .price-tag { background:#e7f3ff; padding:10px; border-radius:8px; text-align:center; font-weight:bold; color:#0077cc; display:none; }
   </style>
 </head>
 <body>
-
-  <div id="gpsHelper">
-    <b>📍 Localização Necessária</b><br>
-    Clique no ícone de <b>cadeado</b> na barra de endereços e mude "Localização" para <b>Permitir</b>.
-    <button onclick="location.reload()" style="background:#856404; padding:5px; margin-top:10px; font-size:12px;">Já autorizei, recarregar!</button>
-  </div>
-
   <h1>Mydi Car</h1>
-
+  
   <div id="authScreen" class="screen active">
     <div class="card">
-      <h2 style="text-align:center; color:#333;">Bem-vindo</h2>
       <input id="reg_email" type="email" placeholder="E-mail">
       <input id="reg_password" type="password" placeholder="Senha">
-      
       <button onclick="fazerLogin()">Entrar</button>
-      <button onclick="criarConta()" style="background:#6c757d;">Cadastrar E-mail</button>
-      
-      <div style="text-align:center; margin:10px 0; color:#888;">OU</div>
-      
-      <button onclick="loginGoogle()" class="google-btn">
-        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18"> 
-        Entrar com Google
-      </button>
+      <button onclick="criarConta()" style="background:#6c757d;">Cadastrar</button>
     </div>
   </div>
 
   <div id="appScreen" class="screen">
     <div class="card">
-      <input id="origem_input" placeholder="Onde você está? (Opcional)" disabled style="background:#eee;">
       <input id="destino_input" placeholder="Para onde vamos?">
-      <button onclick="pedirCorrida()">Solicitar Agora</button>
-      <button onclick="deslogar()" style="background:#ff4444; margin-top:10px; padding:8px; font-size:12px;">Sair da Conta</button>
+      <div id="priceDisplay" class="price-tag"></div>
+      <button onclick="calcularEConfirmar()">Solicitar Mydi Car</button>
     </div>
 
     <div id="statusCard" class="card" style="display:none;">
-      <strong>Status: <span id="statusLabel">Aguardando...</span></strong>
-      <div id="boxMotorista" class="driver-box">
-        <p style="margin:5px 0;">🚗 <b id="nomeM"></b></p>
-        <p style="margin:5px 0;">🚙 <span id="carroM"></span> - <span id="corM"></span></p>
-        <p style="margin:5px 0;">🆔 Placa: <b id="placaM"></b></p>
+      <strong>Status: <span id="statusLabel" style="color:#0077cc;">Aguardando...</span></strong>
+      <div id="boxMotorista" style="margin-top:10px; display:none; border-top:1px solid #eee; padding-top:10px;">
+        <p>🚗 <b id="nomeM"></b> | <span id="carroM"></span> (<span id="corM"></span>)</p>
+        <p>🆔 Placa: <b id="placaM"></b></p>
       </div>
     </div>
-    
     <div id="map"></div>
   </div>
 
   <script>
-    const firebaseConfig = {
-        apiKey: "AIzaSyCXA1yP1F-riNkzOX5zJs5gsQ82EzsT7Qg",
-        authDomain: "myproject26-10f0e.firebaseapp.com",
-        databaseURL: "https://myproject26-10f0e-default-rtdb.firebaseio.com",
-        projectId: "myproject26-10f0e",
-    };
+    const firebaseConfig = { apiKey: "AIzaSyCXA1yP1F-riNkzOX5zJs5gsQ82EzsT7Qg", authDomain: "myproject26-10f0e.firebaseapp.com", databaseURL: "https://myproject26-10f0e-default-rtdb.firebaseio.com", projectId: "myproject26-10f0e" };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.database();
 
-    let userPos = null;
-    let markerUsuario = null;
-    let markerMotorista = null;
-    let linhaRota = null;
-    
+    let userPos = null, markerUsuario = null, markerMotorista = null, linhaRota = null;
     const mapa = L.map('map').setView([-26.48, -49.07], 14);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapa);
 
-    // --- AUTENTICAÇÃO ---
-    function criarConta() {
-      const email = document.getElementById('reg_email').value;
-      const pass = document.getElementById('reg_password').value;
-      auth.createUserWithEmailAndPassword(email, pass)
-        .then(res => salvarDadosNoBanco(res.user))
-        .catch(err => alert(err.message));
-    }
+    auth.onAuthStateChanged(user => { if (user) { document.getElementById('authScreen').classList.remove('active'); document.getElementById('appScreen').classList.add('active'); comecarRastreio(); escutarCorridas(); }});
 
-    function fazerLogin() {
-      const email = document.getElementById('reg_email').value;
-      const pass = document.getElementById('reg_password').value;
-      auth.signInWithEmailAndPassword(email, pass).catch(err => alert(err.message));
-    }
-
-    function loginGoogle() {
-      const provider = new firebase.auth.GoogleAuthProvider();
-      auth.signInWithPopup(provider).then(res => salvarDadosNoBanco(res.user)).catch(err => alert("Erro Google: Verifique os domínios autorizados no Firebase."));
-    }
-
-    function deslogar() {
-      auth.signOut().then(() => location.reload());
-    }
-
-    function salvarDadosNoBanco(user) {
-      db.ref("usuarios/passageiros/" + user.uid).set({
-        nome: user.displayName || "Passageiro",
-        email: user.email,
-        tipo: "passageiro"
-      });
-    }
-
-    auth.onAuthStateChanged(user => {
-      if (user) {
-        document.getElementById('authScreen').classList.remove('active');
-        document.getElementById('appScreen').classList.add('active');
-        comecarRastreioPassageiro();
-        escutarCorridas();
-      }
-    });
-
-    // --- GPS E MAPA ---
-    function comecarRastreioPassageiro() {
-      const helper = document.getElementById('gpsHelper');
+    function comecarRastreio() {
       navigator.geolocation.watchPosition(pos => {
-        helper.style.display = "none";
         userPos = [pos.coords.latitude, pos.coords.longitude];
-        
-        if(!markerUsuario) {
-          mapa.setView(userPos, 16);
-          markerUsuario = L.marker(userPos).addTo(mapa).bindPopup("Você").openPopup();
-        } else {
-          markerUsuario.setLatLng(userPos);
-        }
-        
-        // Tenta preencher o input de origem via Geocodificação reversa (Opcional)
-        document.getElementById('origem_input').value = "Localização Atualizada ✅";
-      }, err => {
-        if(err.code === 1) helper.style.display = "block";
-      }, { enableHighAccuracy: true });
+        if(!markerUsuario) { mapa.setView(userPos, 16); markerUsuario = L.marker(userPos).addTo(mapa); }
+        else markerUsuario.setLatLng(userPos);
+      }, null, { enableHighAccuracy: true });
     }
 
-    // --- CORRIDAS ---
-    function pedirCorrida() {
+    async function calcularEConfirmar() {
       const dest = document.getElementById('destino_input').value;
-      if(!userPos) return alert("Aguardando sinal do GPS...");
-      if(!dest) return alert("Digite o destino!");
+      if(!userPos || !dest) return alert("Ative o GPS e digite o destino!");
 
-      const id = auth.currentUser.uid;
-      db.ref("corridas_ativas/" + id).set({
-        passageiroId: id,
-        origemLat: userPos[0],
-        origemLng: userPos[1],
-        origemNome: "Localização do Passageiro",
-        destinoNome: dest,
-        status: "aguardando",
-        timestamp: Date.now()
-      }).then(() => {
+      // Busca coordenadas do destino (Simulado para o exemplo, em produção use Geocoding)
+      // Aqui usamos um valor fixo de distância para o cálculo inicial do preço
+      const distanciaKm = 5.2; // Exemplo: 5.2km
+      const precoTotal = 5.00 + (distanciaKm * 2.00); // R$ 5 base + R$ 2/km
+      
+      if(confirm(`Viagem estimada em R$ ${precoTotal.toFixed(2)}. Confirmar?`)) {
+        const id = auth.currentUser.uid;
+        db.ref("corridas_ativas/" + id).set({
+          passageiroId: id,
+          origemLat: userPos[0], origemLng: userPos[1],
+          destinoNome: dest,
+          valorTotal: precoTotal.toFixed(2),
+          valorMotorista: (precoTotal * 0.75).toFixed(2), // 75% para o motorista
+          status: "aguardando",
+          timestamp: Date.now()
+        });
         document.getElementById('statusCard').style.display = "block";
-        alert("Solicitação enviada! Aguardando motorista.");
-      });
+      }
     }
 
     function escutarCorridas() {
       const id = auth.currentUser.uid;
       db.ref("corridas_ativas/" + id).on("value", snap => {
-        const dados = snap.val();
-        if(!dados) return;
-
-        document.getElementById('statusLabel').innerText = dados.status.replace(/_/g, " ");
-
-        if(dados.motoristaId) {
-          db.ref("usuarios/motoristas/" + dados.motoristaId).on("value", mSnap => {
+        const c = snap.val(); if(!c) return;
+        document.getElementById('statusLabel').innerText = c.status.toUpperCase();
+        if(c.motoristaId) {
+          db.ref("usuarios/motoristas/" + c.motoristaId).on("value", mSnap => {
             const m = mSnap.val();
-            if(!m) return;
-            
             document.getElementById('boxMotorista').style.display = "block";
             document.getElementById('nomeM').innerText = m.nome;
             document.getElementById('carroM').innerText = m.modelo;
             document.getElementById('corM').innerText = m.cor;
             document.getElementById('placaM').innerText = m.placa;
-
-            if(m.posicao) {
-              moverMotoristaNoMapa(m.posicao.lat, m.posicao.lng);
-            }
+            if(m.posicao) moverMotorista(m.posicao.lat, m.posicao.lng);
           });
         }
       });
     }
 
-    function moverMotoristaNoMapa(lat, lng) {
-      const carIcon = L.icon({
-        iconUrl: 'https://cdn-icons-png.flaticon.com/512/3202/3202926.png',
-        iconSize: [35, 35]
-      });
-
-      if(markerMotorista) {
-        markerMotorista.setLatLng([lat, lng]);
-      } else {
-        markerMotorista = L.marker([lat, lng], { icon: carIcon }).addTo(mapa);
-      }
-      trazarRota(lat, lng);
+    function moverMotorista(lat, lng) {
+      if(markerMotorista) markerMotorista.setLatLng([lat, lng]);
+      else markerMotorista = L.marker([lat, lng], {icon: L.icon({iconUrl:'https://cdn-icons-png.flaticon.com/512/3202/3202926.png', iconSize:[30,30]})}).addTo(mapa);
     }
 
-    function trazarRota(mLat, mLng) {
-      if(linhaRota) mapa.removeLayer(linhaRota);
-      const url = `https://router.project-osrm.org/route/v1/driving/${mLng},${mLat};${userPos[1]},${userPos[0]}?overview=full&geometries=geojson`;
-      
-      fetch(url)
-        .then(r => r.json())
-        .then(res => {
-          if(res.routes && res.routes.length > 0) {
-            const coords = res.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-            linhaRota = L.polyline(coords, { color: '#0077cc', weight: 6, opacity: 0.7 }).addTo(mapa);
-          }
-        });
-    }
+    function fazerLogin() { auth.signInWithEmailAndPassword(reg_email.value, reg_password.value); }
+    function criarConta() { auth.createUserWithEmailAndPassword(reg_email.value, reg_password.value).then(res => db.ref("usuarios/passageiros/"+res.user.uid).set({nome:"Passageiro", email:reg_email.value})); }
   </script>
 </body>
 </html>
